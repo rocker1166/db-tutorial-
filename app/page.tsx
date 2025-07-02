@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -39,34 +39,37 @@ export default function DatabaseTutorial() {
   }
 
   // Generic function to create user in either database
-  const createUser = async (database: "supabase" | "mongodb") => {
-    if (!newUser.name || !newUser.email || !newUser.age) {
-      alert("Please fill all fields")
-      return
-    }
-
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/${database}/users`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newUser.name,
-          email: newUser.email,
-          age: Number.parseInt(newUser.age),
-        }),
-      })
-
-      if (response.ok) {
-        setNewUser({ name: "", email: "", age: "" })
-        fetchUsers(database) // Refresh the list
+  const createUser = useCallback(
+    async (database: "supabase" | "mongodb") => {
+      if (!newUser.name || !newUser.email || !newUser.age) {
+        alert("Please fill all fields")
+        return
       }
-    } catch (error) {
-      console.error(`Error creating user in ${database}:`, error)
-    } finally {
-      setLoading(false)
-    }
-  }
+
+      setLoading(true)
+      try {
+        const response = await fetch(`/api/${database}/users`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: newUser.name,
+            email: newUser.email,
+            age: Number.parseInt(newUser.age),
+          }),
+        })
+
+        if (response.ok) {
+          setNewUser((prev) => ({ ...prev, name: "", email: "", age: "" }))
+          fetchUsers(database) // Refresh the list
+        }
+      } catch (error) {
+        console.error(`Error creating user in ${database}:`, error)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [newUser, fetchUsers]
+  )
 
   // Generic function to delete user from either database
   const deleteUser = async (database: "supabase" | "mongodb", userId: string) => {
@@ -94,7 +97,7 @@ export default function DatabaseTutorial() {
           <Input
             id={`name-${database}`}
             value={newUser.name}
-            onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+            onChange={(e) => setNewUser((prev) => ({ ...prev, name: e.target.value }))}
             placeholder="Enter name"
           />
         </div>
@@ -104,7 +107,7 @@ export default function DatabaseTutorial() {
             id={`email-${database}`}
             type="email"
             value={newUser.email}
-            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+            onChange={(e) => setNewUser((prev) => ({ ...prev, email: e.target.value }))}
             placeholder="Enter email"
           />
         </div>
@@ -114,7 +117,7 @@ export default function DatabaseTutorial() {
             id={`age-${database}`}
             type="number"
             value={newUser.age}
-            onChange={(e) => setNewUser({ ...newUser, age: e.target.value })}
+            onChange={(e) => setNewUser((prev) => ({ ...prev, age: e.target.value }))}
             placeholder="Enter age"
           />
         </div>
