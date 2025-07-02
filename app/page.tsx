@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, memo } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -19,13 +19,82 @@ interface User {
   createdAt?: string
 }
 
+// Memoized UserForm component to prevent unnecessary re-renders
+const UserForm = memo(function UserForm({
+  database,
+  newUser,
+  setNewUser,
+  loading,
+  createUser,
+  fetchUsers
+}: {
+  database: "supabase" | "mongodb"
+  newUser: { name: string; email: string; age: string }
+  setNewUser: (user: { name: string; email: string; age: string }) => void
+  loading: boolean
+  createUser: (database: "supabase" | "mongodb") => void
+  fetchUsers: (database: "supabase" | "mongodb") => void
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <Label htmlFor={`name-${database}`}>Name</Label>
+          <Input
+            id={`name-${database}`}
+            value={newUser.name}
+            onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+            placeholder="Enter name"
+          />
+        </div>
+        <div>
+          <Label htmlFor={`email-${database}`}>Email</Label>
+          <Input
+            id={`email-${database}`}
+            type="email"
+            value={newUser.email}
+            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+            placeholder="Enter email"
+          />
+        </div>
+        <div>
+          <Label htmlFor={`age-${database}`}>Age</Label>
+          <Input
+            id={`age-${database}`}
+            type="number"
+            value={newUser.age}
+            onChange={(e) => setNewUser({ ...newUser, age: e.target.value })}
+            placeholder="Enter age"
+          />
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <Button onClick={() => createUser(database)} disabled={loading}>
+          <Plus className="w-4 h-4 mr-2" />
+          Add User
+        </Button>
+        <Button variant="outline" onClick={() => fetchUsers(database)} disabled={loading}>
+          <Search className="w-4 h-4 mr-2" />
+          Fetch Users
+        </Button>
+      </div>
+    </div>
+  )
+})
+
 export default function DatabaseTutorial() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [newUser, setNewUser] = useState({ name: "", email: "", age: "" })
+  const [activeTab, setActiveTab] = useState<"supabase" | "mongodb">("supabase")
+
+  // Fetch users when tab changes
+  useEffect(() => {
+    fetchUsers(activeTab)
+  }, [activeTab])
 
   // Generic function to fetch users from either database
-  const fetchUsers = async (database: "supabase" | "mongodb") => {
+  const fetchUsers = useCallback(async (database: "supabase" | "mongodb") => {
     setLoading(true)
     try {
       const response = await fetch(`/api/${database}/users`)
@@ -36,7 +105,7 @@ export default function DatabaseTutorial() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   // Generic function to create user in either database
   const createUser = useCallback(
@@ -59,7 +128,7 @@ export default function DatabaseTutorial() {
         })
 
         if (response.ok) {
-          setNewUser((prev) => ({ ...prev, name: "", email: "", age: "" }))
+          setNewUser({ name: "", email: "", age: "" })
           fetchUsers(database) // Refresh the list
         }
       } catch (error) {
@@ -72,7 +141,7 @@ export default function DatabaseTutorial() {
   )
 
   // Generic function to delete user from either database
-  const deleteUser = async (database: "supabase" | "mongodb", userId: string) => {
+  const deleteUser = useCallback(async (database: "supabase" | "mongodb", userId: string) => {
     setLoading(true)
     try {
       const response = await fetch(`/api/${database}/users/${userId}`, {
@@ -87,55 +156,9 @@ export default function DatabaseTutorial() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [fetchUsers])
 
-  const UserForm = ({ database }: { database: "supabase" | "mongodb" }) => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <Label htmlFor={`name-${database}`}>Name</Label>
-          <Input
-            id={`name-${database}`}
-            value={newUser.name}
-            onChange={(e) => setNewUser((prev) => ({ ...prev, name: e.target.value }))}
-            placeholder="Enter name"
-          />
-        </div>
-        <div>
-          <Label htmlFor={`email-${database}`}>Email</Label>
-          <Input
-            id={`email-${database}`}
-            type="email"
-            value={newUser.email}
-            onChange={(e) => setNewUser((prev) => ({ ...prev, email: e.target.value }))}
-            placeholder="Enter email"
-          />
-        </div>
-        <div>
-          <Label htmlFor={`age-${database}`}>Age</Label>
-          <Input
-            id={`age-${database}`}
-            type="number"
-            value={newUser.age}
-            onChange={(e) => setNewUser((prev) => ({ ...prev, age: e.target.value }))}
-            placeholder="Enter age"
-          />
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <Button onClick={() => createUser(database)} disabled={loading}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add User
-        </Button>
-        <Button variant="outline" onClick={() => fetchUsers(database)} disabled={loading}>
-          <Search className="w-4 h-4 mr-2" />
-          Fetch Users
-        </Button>
-      </div>
-    </div>
-  )
-
-  const UserList = ({ database }: { database: "supabase" | "mongodb" }) => (
+  const UserList = useCallback(({ database }: { database: "supabase" | "mongodb" }) => (
     <div className="space-y-2">
       {users.length === 0 ? (
         <p className="text-muted-foreground text-center py-4">No users found. Add some users or fetch from database.</p>
@@ -161,7 +184,7 @@ export default function DatabaseTutorial() {
         ))
       )}
     </div>
-  )
+  ), [users, loading, deleteUser])
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -182,7 +205,11 @@ export default function DatabaseTutorial() {
         </div>
       </div>
 
-      <Tabs defaultValue="supabase" className="w-full">
+      <Tabs 
+        defaultValue="supabase" 
+        className="w-full"
+        onValueChange={(value) => setActiveTab(value as "supabase" | "mongodb")}
+      >
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="supabase" className="flex items-center gap-2">
             <Database className="w-4 h-4" />
@@ -207,7 +234,14 @@ export default function DatabaseTutorial() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <UserForm database="supabase" />
+              <UserForm 
+                database="supabase"
+                newUser={newUser}
+                setNewUser={setNewUser}
+                loading={loading}
+                createUser={createUser}
+                fetchUsers={fetchUsers}
+              />
               <UserList database="supabase" />
             </CardContent>
           </Card>
@@ -226,7 +260,14 @@ export default function DatabaseTutorial() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <UserForm database="mongodb" />
+              <UserForm 
+                database="mongodb"
+                newUser={newUser}
+                setNewUser={setNewUser}
+                loading={loading}
+                createUser={createUser}
+                fetchUsers={fetchUsers}
+              />
               <UserList database="mongodb" />
             </CardContent>
           </Card>
